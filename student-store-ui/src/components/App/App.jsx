@@ -10,6 +10,7 @@ import { removeFromCart, addToCart, getQuantityOfItemInCart, getTotalItemsInCart
 import "./App.css";
 
 function App() {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
   // State variables
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,7 +38,61 @@ function App() {
   };
 
   const handleOnCheckout = async () => {
+    if (!Object.keys(cart).length) {
+      setError("Your cart is empty.");
+      return;
+    }
+
+    const customerId = Number(userInfo.name);
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      setError("Student ID must be a positive integer.");
+      return;
+    }
+
+    const items = Object.entries(cart).map(([productId, quantity]) => {
+      const product = products.find((p) => p.id === Number(productId));
+      return {
+        product_id: Number(productId),
+        quantity,
+        price: product?.price ?? 0,
+      };
+    });
+
+    setIsCheckingOut(true);
+    setError(null);
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/orders`, {
+        customer_id: customerId,
+        status: "pending",
+        items,
+      });
+      setOrder(response.data);
+      setCart({});
+      setUserInfo({ name: "", dorm_number: "" });
+    } catch (err) {
+      setError(err?.response?.data?.error || "Unable to checkout right now.");
+    } finally {
+      setIsCheckingOut(false);
+    }
   }
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setIsFetching(true);
+      setError(null);
+      try {
+        const response = await axios.get(`${API_BASE_URL}/products`);
+        setProducts(response.data || []);
+      } catch (err) {
+        setError(err?.response?.data?.error || "Unable to fetch products.");
+      } finally {
+        setIsFetching(false);
+      }
+    };
+
+    fetchProducts();
+  }, [API_BASE_URL]);
 
 
   return (

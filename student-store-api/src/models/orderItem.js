@@ -1,29 +1,29 @@
 const prisma = require('../db/db')
 
-const listOrderItems = (order_id) =>
-  prisma.orderItem.findMany({
-    where: order_id ? { order_id } : undefined,
-    orderBy: { order_item_id: 'asc' },
-  })
+class OrderItem {
+  static async createMany(orderId, items, dbClient = prisma) {
+    if (!Array.isArray(items) || !items.length) return []
 
-const createOrderItem = async ({ order_id, product_id, quantity, price }) => {
-  let unitPrice = price
-  if (unitPrice == null) {
-    const product = await prisma.product.findUnique({ where: { id: product_id } })
-    if (!product) {
-      throw Object.assign(new Error(`Product ${product_id} not found`), {
-        code: 'PRODUCT_NOT_FOUND',
-      })
-    }
-    unitPrice = product.price
+    await dbClient.orderItem.createMany({
+      data: items.map((item) => ({
+        order_id: Number(orderId),
+        product_id: Number(item.product_id),
+        quantity: Number(item.quantity),
+        price: Number(item.price),
+      })),
+    })
+
+    return this.getByOrderId(orderId, dbClient)
   }
 
-  return prisma.orderItem.create({
-    data: { order_id, product_id, quantity, price: unitPrice },
-  })
+  static async getByOrderId(orderId, dbClient = prisma) {
+    return dbClient.orderItem.findMany({
+      where: { order_id: Number(orderId) },
+      orderBy: { order_item_id: 'asc' },
+    })
+  }
 }
 
 module.exports = {
-  listOrderItems,
-  createOrderItem,
+  OrderItem,
 }

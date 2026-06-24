@@ -6,11 +6,28 @@ import { formatPrice } from "../../utils/format";
 import "./ProductDetail.css";
 
 function ProductDetail({ addToCart, removeFromCart, getQuantityOfItemInCart }) {
-  
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      setIsFetching(true);
+      setError(null);
+      try {
+        const response = await axios.get(`${API_BASE_URL}/products/${productId}`);
+        setProduct(response.data);
+      } catch (err) {
+        setError(err?.response?.data?.error || "Unable to fetch product.");
+      } finally {
+        setIsFetching(false);
+      }
+    };
+
+    fetchProduct();
+  }, [API_BASE_URL, productId]);
 
 
   if (error) {

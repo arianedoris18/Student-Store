@@ -64,8 +64,19 @@
 
 #### GET `/products`
 - **Request:** no body, no params.
+- **Query Parameters:**
+  - `category` (string, optional): filters products by exact category match.
+    - Example: `GET /products?category=Apparel`
+  - `sort` (string, optional): sorts by a supported field.
+    - Supported values: `price`, `name`
+    - Example: `GET /products?sort=price`
+  - **Combined usage:** both can be used together, e.g. `GET /products?category=Snacks&sort=name`
+  - **Default behavior:** if no query parameters are provided, return all products with no explicit ordering applied.
 - **Success:** `200 OK`
   - Body: `Product[]`
+- **Invalid/unknown query behavior:**
+  - Unknown `category` values return `200 OK` with an empty array `[]`.
+  - Unsupported `sort` values are ignored and results are returned without explicit ordering.
 - **Error example:** `500 Internal Server Error`
   - Body: `{ "error": "Failed to fetch products" }`
 
@@ -178,18 +189,57 @@
    - `items` must be a non-empty array.
    - each item must include valid `product_id`, `quantity`, and `price`.
 2. Compute `total_price` as `sum(quantity * price)` across all items.
-3. Execute one Prisma create operation for `Order` with nested `order_items.create[]` in the same call.
-4. Prisma persists:
-   - parent `Order` row first,
-   - then child `OrderItem` rows linked by generated `order_id`,
-   - as one atomic DB transaction.
-5. Return created order with included `order_items` and status `201`.
+3. Start `prisma.$transaction(...)` so every write is inside one atomic unit.
+4. Inside the transaction:
+   - create the parent `Order` row first,
+   - create all `OrderItem` rows linked by the generated `order_id`,
+   - query the created order back with `include: { order_items: true }`.
+5. Return the created order with included `order_items` and status `201`.
 
 ### Atomicity and rollback behavior
-Because the endpoint uses nested create in a single Prisma write, it is atomic at the database level. If any line item fails (for example, a `product_id` does not exist and violates foreign key constraints), Prisma rolls back the full operation. No partial order remains in the database.
+Because the endpoint runs in `prisma.$transaction`, all writes either succeed together or fail together. If any line item fails (for example, a `product_id` does not exist and violates foreign key constraints), Prisma rolls back the full transaction. No partial order remains in the database.
 
 ### Failure response for nonexistent product
 If any item references a missing product:
 - request fails with `400 Bad Request`
 - response body: `{ "error": "Invalid product_id in order items" }`
 - no `Order` or `OrderItem` rows are created.
+
+## Decisions Log — Product Model
+
+- **Schema translation that went smoothly**: `id`, `name`, `description`, `price`, `image_url`, and `category` mapped directly from the Product spec into Prisma with no type ambiguity.
+- **Field decision I made during implementation that wasn't in the original spec**: kept all Product fields required (no optional `?` fields) so `POST /products` always creates complete catalog records.
+- **Route behavior that needed a spec update**: `PUT /products/:id` now accepts and persists `category` updates in addition to name/description/price/image_url to stay consistent with the Product model fields.
+
+## Spec Reconciliation — Milestone 4 (Schema Audit)
+
+### Schema vs. spec gaps found
+- No gaps found: `Product`, `Order`, and `OrderItem` fields in `schema.prisma` match the Data Models section.
+- Relationship wiring matches spec: `OrderItem.order_id` references `Order.order_id` and `OrderItem.product_id` references `Product.id`.
+- Cascade rules match spec: both relations on `OrderItem` use `onDelete: Cascade`.
+
+### Cascade delete verification
+- Deleting a Product removes associated OrderItems: ✅ tested
+- Deleting an Order removes associated OrderItems: ✅ tested
+
+## Decisions Log — Order Creation Transaction
+
+- **What my Transactional Flow spec got right**: the order of operations was correct: validate input, compute total, create order, create order items, return the order with items.
+- **What the spec missed that I discovered during implementation**: the implementation now explicitly uses `prisma.$transaction` rather than relying on nested writes so the transactional boundary is obvious in code.
+- **How the transaction error handling works**: if any statement inside `prisma.$transaction` throws (for example invalid `product_id` foreign key), Prisma aborts and rolls back all prior writes in that transaction.
+- **One thing I'd design differently if starting over**: I would derive each item price from the Product table server-side instead of accepting item prices from the client request body.
+
+## Final Spec Reconciliation: Project Complete
+
+### Full-system audit result
+- Product API contract and Order API contract match backend behavior for the implemented endpoints (`/products`, `/products/:id`, `/orders`, `/orders/:order_id`, `POST /orders`, update/delete endpoints).
+- `POST /orders` request/response now matches the spec and returns created order data with associated `order_items`.
+- CORS middleware is enabled in `server.js` and supports frontend-backend communication from the Vite dev server.
+
+### Gaps resolved during frontend integration
+- Frontend had no active API requests implemented; added product list fetch, product detail fetch, and checkout order creation calls aligned to the API contract.
+- Checkout UI expected `order.purchase.receipt` shape, but API returns order records with `order_items`; updated frontend receipt rendering to use actual API response fields.
+- Payment form state used mismatched fields (`id`/`email`) while backend expects `customer_id`; updated frontend mapping so student ID input is used to produce numeric `customer_id`.
+
+### What the spec enabled during this project
+The written API and transactional specs made it much faster to identify integration mismatches because request/response shapes were explicit before wiring the frontend. During debugging, the spec gave a concrete source of truth for whether to change frontend code, backend code, or both.
