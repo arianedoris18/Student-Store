@@ -105,8 +105,12 @@ https://www.loom.com/share/3837ca7a372946ae8d6fc252390129c2
 The lab really did help me prepare for this project especially connecting the backend to the frontend. 
 
 - If you had more time, what would you have done differently? Would you have added additional features? Changed the way your project responded to a particular event, etc.
-  If I had more time I would do my stetches, add review and edit my UI. 
+
+   If I had more time I would do my stetches, add review and edit my UI.
+  
 - Reflect on your project demo, what went well? Were there things that maybe didn't go as planned? Did you notice something that your peer did that you would like to try next time?
+
+
 I was not ready I wish i had prepared more and edited my slides.
 
 ### Open-source libraries used
