@@ -1,11 +1,12 @@
-const prisma = require('../db/db')
+const prisma = require('../db/db')// imports prisma client and connects to db.js
 
-class Product {
-  static async getAll(query = {}) {
+
+class Product { // creates Class Product this groups db methods and keeps raw db separateed from the HTTP routes
+  static async getAll(query = {}) {// fetches many products from the database
     const where = {}
     let orderBy
 
-    if (query.category) {
+    if (query.category) {// filters products by category if category is provided in the query
       where.category = query.category
     }
 
@@ -19,14 +20,14 @@ class Product {
     })
   }
 
-  static async getById(id) {
-    return prisma.product.findUnique({
-      where: { id: Number(id) },
-    })
+  static async getById(id) {// fetches a single product from the database by id
+    return prisma.product.findUnique({// finds the product with the given id
+      where: { id: Number(id) },// changes id into a number
+    })// returns the product with the given id
   }
 
   static async create(data) {
-    return prisma.product.create({
+    return prisma.product.create({// creates a new product in the database
       data: {
         name: data.name,
         description: data.description,
@@ -37,7 +38,7 @@ class Product {
     })
   }
 
-  static async update(id, data) {
+  static async update(id, data) { 
     return prisma.product.update({
       where: { id: Number(id) },
       data: {
@@ -57,8 +58,8 @@ class Product {
   }
 }
 
-
-const getProducts = async (req, res) => {
+// we move on to controller handlers
+const getProducts = async (req, res) => { // express handler for list endpoint.
     try {
         const products = await Product.getAll(req.query)
         res.json(products)
@@ -69,8 +70,8 @@ const getProducts = async (req, res) => {
 
 const getProductById = async (req, res) =>{
     try {
-        const { id } = req.params
-        const product = await Product.getById(id);
+        const { id } = req.params// extracts the id from the request parameters
+        const product = await Product.getById(id);// fetches a single product from the database by id
 
         if (!product) return res.status(404).json({ error: 'Product not found' });
         res.json(product)
@@ -81,8 +82,8 @@ const getProductById = async (req, res) =>{
 
 const createProduct = async (req, res) =>{
     try {
-        const newProduct = await Product.create(req.body)
-        res.status(201).json(newProduct);
+        const newProduct = await Product.create(req.body);// creates a new product in the database
+        res.status(201).json(newProduct);// returns the new product
     } catch (error) {
         if (error.code === 'P2002') {
             return res.status(400).json({ error: 'Product already exists' })
@@ -93,11 +94,14 @@ const createProduct = async (req, res) =>{
 
 const updateProduct = async (req, res) =>{
     try {
-        const { id } = req.params
-        const updatedProduct = await Product.update(id, req.body);
-        res.json(updatedProduct);
+        const id = req.params.id ?? req.body.id // support /products/:id and /products with id in body
+        if (!id) {
+            return res.status(400).json({ error: 'Product id is required' })
+        }
+        const updatedProduct = await Product.update(id, req.body);// updates a product in the database
+        res.json(updatedProduct);// returns the updated product
     } catch (error) {
-        if (error.code === 'P2025') {
+        if (error.code === 'P2025') {//
             return res.status(404).json({ error: 'Product not found' })
         }
        
@@ -108,7 +112,7 @@ const updateProduct = async (req, res) =>{
 const deleteProduct = async (req, res) =>{
     try {
         const { id } = req.params
-        await Product.delete(id);
+        const deletedProduct = await Product.delete(id);// deletes a product from the database
         res.json({ message: 'Product deleted successfully' });
     } catch (error) {
         if (error.code === 'P2025') {
@@ -118,11 +122,12 @@ const deleteProduct = async (req, res) =>{
     }
 };
 
+//Exporting and connecting the gile to routes. 
 module.exports = {
-    Product,
-    getProducts,
-    getProductById,
+    Product,// for reusing and testig or direct model use. 
+    getProducts,// for listing all products. 
+    getProductById,// for fetching a single product by id. 
     createProduct,
-    updateProduct,
-    deleteProduct,
+    updateProduct,// for updating a product by id. 
+    deleteProduct,// for deleting a product by id. 
 };
