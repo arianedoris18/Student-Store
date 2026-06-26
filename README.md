@@ -96,7 +96,7 @@ Deployed Application (optional): [Student Store Deployed Site](ADD_LINK_HERE)
 
 ### Walkthrough Video
 
-`https://www.loom.com/share/3837ca7a372946ae8d6fc252390129c2`
+https://www.loom.com/share/3837ca7a372946ae8d6fc252390129c2
 
 ### Reflection
 
